@@ -39,7 +39,7 @@
       </div>
 
       <nav class="hidden md:flex gap-6 text-sm">
-        <a href="#" class="text-[var(--text-secondary)] hover:text-[var(--primary-color)]">Home</a>
+        <a href="index.php" class="text-[var(--text-secondary)] hover:text-[var(--primary-color)]">Home</a>
         <a href="#" class="text-[var(--text-secondary)] hover:text-[var(--primary-color)]">About</a>
         <a href="#" class="text-[var(--text-secondary)] hover:text-[var(--primary-color)]">Courses</a>
         <a href="#" class="text-[var(--text-secondary)] hover:text-[var(--primary-color)]">Contact</a>

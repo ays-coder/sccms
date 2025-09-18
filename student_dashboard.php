@@ -1,4 +1,4 @@
- <?php
+ <?php 
 session_start();
 require_once 'db_connect.php';
 
@@ -7,6 +7,50 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student') {
     header("Location: login.php");
     exit();
 }
+
+// Fetch the user's status from DB
+$user_id = $_SESSION['user_id'];
+$stmt = $conn->prepare("SELECT status FROM users WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stmt->bind_result($status);
+$stmt->fetch();
+$stmt->close();
+
+// If account is deactivated, show notice and stop
+if ($status === 'deactivated') {
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Account Deactivated - Smart Commerce Core</title>
+      <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+      <style>
+        body { font-family: 'Public Sans', sans-serif; }
+      </style>
+    </head>
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white shadow p-8 rounded max-w-lg text-center">
+        <h1 class="text-2xl font-bold mb-4 text-red-600">Account Deactivated</h1>
+        <p class="mb-6 text-gray-700">
+          Your account has been deactivated due to overdue payments.
+        </p>
+        <p class="mb-6 text-gray-700">
+          Please settle your monthly payment or contact the admin for assistance.
+        </p>
+        <a href="logout.php" class="inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
+          Logout
+        </a>
+      </div>
+    </body>
+    </html>
+    <?php
+    exit();
+}
+
+// If active, continue showing the dashboard below
 ?>
 <!DOCTYPE html>
 <html lang="en">

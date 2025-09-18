@@ -1,4 +1,6 @@
- 
+ <?php
+$selected_role = isset($_GET['role']) ? $_GET['role'] : '';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,6 +34,9 @@
     .header-link {
       @apply text-[var(--text-primary)] text-sm font-medium hover:text-[var(--primary-color)];
     }
+
+    .strength-weak { color: red; font-weight: bold; }
+    .strength-strong { color: green; font-weight: bold; }
   </style>
 </head>
 <body class="bg-slate-50">
@@ -55,23 +60,29 @@
       <div class="w-full max-w-md bg-white p-6 sm:p-8 rounded-xl shadow-lg">
         <h2 class="text-2xl font-bold text-center mb-1 text-[var(--text-primary)]">Create Your Account</h2>
         <p class="text-sm text-center mb-6 text-[var(--text-secondary)]">Join Smart Commerce Core and start your learning journey.</p>
-       <form method="POST" action="register_action.php" class="space-y-4">
-  <input type="text" name="username" placeholder="Full Name" class="form-input" required />
-  <input type="email" name="email" placeholder="Email Address" class="form-input" required />
-   
-<?php $selected_role = isset($_GET['role']) ? $_GET['role'] : ''; ?>
- 
-<select name="role" class="form-input" required>
-  <option value="" disabled <?= $selected_role ? '' : 'selected' ?>>Select your role</option>
-  <option value="tutor" <?= $selected_role == 'tutor' ? 'selected' : '' ?>>Tutor</option>
-  <option value="student" <?= $selected_role == 'student' ? 'selected' : '' ?>>Student</option>
-  <option value="parent" <?= $selected_role == 'parent' ? 'selected' : '' ?>>Parent</option>
-</select>
- 
-  <input type="password" name="password" placeholder="Password" class="form-input" required />
-  <input type="password" name="confirm_password" placeholder="Confirm Password" class="form-input" required />
-  <button type="submit" class="btn-primary">Register</button>
-</form>
+
+        <form id="registerForm" method="POST" action="register_action.php" class="space-y-4">
+          <input type="text" name="username" id="username" placeholder="Full Name" class="form-input" required />
+          <span id="nameError" class="text-red-500 text-sm hidden">Name must contain letters only</span>
+
+          <input type="email" name="email" id="email" placeholder="Email Address" class="form-input" required />
+          <span id="emailError" class="text-red-500 text-sm hidden">Invalid email address</span>
+
+          <select name="role" class="form-input" required>
+            <option value="" disabled <?= $selected_role ? '' : 'selected' ?>>Select your role</option>
+            <option value="tutor" <?= $selected_role == 'tutor' ? 'selected' : '' ?>>Tutor</option>
+            <option value="student" <?= $selected_role == 'student' ? 'selected' : '' ?>>Student</option>
+            <option value="parent" <?= $selected_role == 'parent' ? 'selected' : '' ?>>Parent</option>
+          </select>
+
+          <input type="password" name="password" id="password" placeholder="Password" class="form-input" required />
+          <span id="passwordStrength" class="text-sm"></span>
+
+          <input type="password" name="confirm_password" id="confirm_password" placeholder="Confirm Password" class="form-input" required />
+          <span id="passwordError" class="text-red-500 text-sm hidden">Passwords do not match</span>
+
+          <button type="submit" class="btn-primary">Register</button>
+        </form>
 
         <p class="text-sm text-center mt-4 text-[var(--text-secondary)]">
           Already have an account?
@@ -84,5 +95,67 @@
       <p>© 2024 Smart Commerce Core. All rights reserved.</p>
     </footer>
   </div>
+
+  <script>
+    const username = document.getElementById('username');
+    const nameError = document.getElementById('nameError');
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const passwordError = document.getElementById('passwordError');
+    const passwordStrength = document.getElementById('passwordStrength');
+    const email = document.getElementById('email');
+    const emailError = document.getElementById('emailError');
+
+    // Name validation
+    username.addEventListener('input', () => {
+      const regex = /^[A-Za-z\s]+$/;
+      nameError.classList.toggle('hidden', regex.test(username.value));
+    });
+
+    // Password strength
+    password.addEventListener('input', () => {
+      if (password.value.length < 8) {
+        passwordStrength.textContent = "Weak password";
+        passwordStrength.className = "strength-weak";
+      } else {
+        passwordStrength.textContent = "Strong password";
+        passwordStrength.className = "strength-strong";
+      }
+    });
+
+    // Email format
+    email.addEventListener('input', () => {
+      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      emailError.classList.toggle('hidden', regex.test(email.value));
+    });
+
+    // Form validation before submit
+    document.getElementById('registerForm').addEventListener('submit', (e) => {
+      let valid = true;
+
+      if (!/^[A-Za-z\s]+$/.test(username.value)) {
+        nameError.classList.remove('hidden');
+        valid = false;
+      }
+
+      if (password.value.length < 8) {
+        valid = false;
+      }
+
+      if (password.value !== confirmPassword.value) {
+        passwordError.classList.remove('hidden');
+        valid = false;
+      } else {
+        passwordError.classList.add('hidden');
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+        emailError.classList.remove('hidden');
+        valid = false;
+      }
+
+      if (!valid) e.preventDefault();
+    });
+  </script>
 </body>
 </html>

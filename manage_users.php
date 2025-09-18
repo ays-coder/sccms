@@ -21,11 +21,28 @@ if (isset($_GET['delete'])) {
     exit();
 }
 
-// Fetch student users
-$students = $conn->query("SELECT * FROM users WHERE role = 'student'");
+// Handle new admin creation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_admin'])) {
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
-// Fetch parent users
-$parents = $conn->query("SELECT * FROM users WHERE role = 'parent'");
+    if (!empty($username) && !empty($email) && !empty($_POST['password'])) {
+        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, created_at) VALUES (?, ?, ?, 'admin', NOW())");
+        $stmt->bind_param("sss", $username, $email, $password);
+        $stmt->execute();
+        header("Location: manage_users.php");
+        exit();
+    } else {
+        $error = "All fields are required to create a new admin.";
+    }
+}
+
+// Fetch users by role
+$students = $conn->query("SELECT * FROM users WHERE role = 'student'");
+$parents  = $conn->query("SELECT * FROM users WHERE role = 'parent'");
+$tutors   = $conn->query("SELECT * FROM users WHERE role = 'tutor'");
+$admins   = $conn->query("SELECT * FROM users WHERE role = 'admin'");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -34,9 +51,7 @@ $parents = $conn->query("SELECT * FROM users WHERE role = 'parent'");
   <title>Manage Users | Smart Commerce Core</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Public Sans', sans-serif; }
-  </style>
+  <style>body { font-family: 'Public Sans', sans-serif; }</style>
 </head>
 <body class="bg-gray-100 min-h-screen">
   <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
@@ -51,80 +66,70 @@ $parents = $conn->query("SELECT * FROM users WHERE role = 'parent'");
   </header>
 
   <main class="max-w-7xl mx-auto py-10">
-    <h1 class="text-3xl font-bold mb-8 text-center">Student & Parent Users</h1>
 
-    <div class="flex flex-col md:flex-row gap-8">
-      <!-- Student Users -->
-      <div class="w-full md:w-1/2 bg-white shadow rounded-lg p-4">
-        <h2 class="text-xl font-semibold text-blue-700 mb-4">Students</h2>
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-sm text-left text-gray-600">
-            <thead class="bg-blue-100 text-blue-800 uppercase text-xs">
-              <tr>
-                <th class="px-4 py-2">User ID</th>
-                <th class="px-4 py-2">Username</th>
-                <th class="px-4 py-2">Email</th>
-                <th class="px-4 py-2">Created</th>
-                <th class="px-4 py-2 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if ($students && $students->num_rows > 0): ?>
-                <?php while($row = $students->fetch_assoc()): ?>
-                  <tr class="border-b hover:bg-gray-50">
-                    <td class="px-4 py-2"><?= $row['user_id'] ?></td>
-                    <td class="px-4 py-2"><?= htmlspecialchars($row['username']) ?></td>
-                    <td class="px-4 py-2"><?= htmlspecialchars($row['email']) ?></td>
-                    <td class="px-4 py-2"><?= $row['created_at'] ?></td>
-                    <td class="px-4 py-2 text-right">
-                      <a href="?delete=<?= $row['user_id'] ?>" onclick="return confirm('Delete this student?');"
-                         class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs">Delete</a>
-                    </td>
-                  </tr>
-                <?php endwhile; ?>
-              <?php else: ?>
-                <tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No students found.</td></tr>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <!-- Create Admin Form -->
+    <div class="bg-white p-6 shadow rounded-lg mb-10">
+      <h2 class="text-2xl font-semibold mb-4 text-blue-700">Create New Admin</h2>
+      <?php if (!empty($error)): ?>
+        <p class="text-red-500 mb-4"><?= htmlspecialchars($error) ?></p>
+      <?php endif; ?>
+      <form method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <input type="text" name="username" placeholder="Username" class="border rounded p-2" required>
+        <input type="email" name="email" placeholder="Email" class="border rounded p-2" required>
+        <input type="password" name="password" placeholder="Password" class="border rounded p-2" required>
+        <button type="submit" name="create_admin" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Admin</button>
+      </form>
+    </div>
 
-      <!-- Parent Users -->
-      <div class="w-full md:w-1/2 bg-white shadow rounded-lg p-4">
-        <h2 class="text-xl font-semibold text-blue-700 mb-4">Parents</h2>
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-sm text-left text-gray-600">
-            <thead class="bg-blue-100 text-blue-800 uppercase text-xs">
-              <tr>
-                <th class="px-4 py-2">User ID</th>
-                <th class="px-4 py-2">Username</th>
-                <th class="px-4 py-2">Email</th>
-                <th class="px-4 py-2">Created</th>
-                <th class="px-4 py-2 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if ($parents && $parents->num_rows > 0): ?>
-                <?php while($row = $parents->fetch_assoc()): ?>
-                  <tr class="border-b hover:bg-gray-50">
-                    <td class="px-4 py-2"><?= $row['user_id'] ?></td>
-                    <td class="px-4 py-2"><?= htmlspecialchars($row['username']) ?></td>
-                    <td class="px-4 py-2"><?= htmlspecialchars($row['email']) ?></td>
-                    <td class="px-4 py-2"><?= $row['created_at'] ?></td>
-                    <td class="px-4 py-2 text-right">
-                      <a href="?delete=<?= $row['user_id'] ?>" onclick="return confirm('Delete this parent?');"
-                         class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs">Delete</a>
-                    </td>
-                  </tr>
-                <?php endwhile; ?>
-              <?php else: ?>
-                <tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No parents found.</td></tr>
-              <?php endif; ?>
-            </tbody>
-          </table>
+    <h1 class="text-3xl font-bold mb-8 text-center">All User Roles</h1>
+
+    <div class="flex flex-col gap-8">
+      <?php
+      $roles = [
+        'Admins' => $admins,
+        'Tutors' => $tutors,
+        'Students' => $students,
+        'Parents' => $parents
+      ];
+      foreach ($roles as $title => $result):
+      ?>
+        <div class="bg-white shadow rounded-lg p-4">
+          <h2 class="text-xl font-semibold text-blue-700 mb-4"><?= $title ?></h2>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-left text-gray-600">
+              <thead class="bg-blue-100 text-blue-800 uppercase text-xs">
+                <tr>
+                  <th class="px-4 py-2">User ID</th>
+                  <th class="px-4 py-2">Username</th>
+                  <th class="px-4 py-2">Email</th>
+                  <th class="px-4 py-2">Created</th>
+                  <th class="px-4 py-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php if ($result && $result->num_rows > 0): ?>
+                  <?php while($row = $result->fetch_assoc()): ?>
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="px-4 py-2"><?= $row['user_id'] ?></td>
+                      <td class="px-4 py-2"><?= htmlspecialchars($row['username']) ?></td>
+                      <td class="px-4 py-2"><?= htmlspecialchars($row['email']) ?></td>
+                      <td class="px-4 py-2"><?= $row['created_at'] ?></td>
+                      <td class="px-4 py-2 text-right">
+                        <?php if ($row['user_id'] != $_SESSION['user_id']): ?>
+                          <a href="?delete=<?= $row['user_id'] ?>" onclick="return confirm('Delete this user?');"
+                             class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs">Delete</a>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endwhile; ?>
+                <?php else: ?>
+                  <tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No <?= strtolower($title) ?> found.</td></tr>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      <?php endforeach; ?>
     </div>
 
     <div class="mt-8 text-center">

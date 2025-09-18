@@ -49,7 +49,6 @@ check_admin_login();
         <span class="font-semibold text-lg mb-1">Manage Courses</span>
         <p class="text-gray-500 text-sm text-center">Create courses, assign tutors, set academic calendars.</p>
       </a>
-
       <!-- Attendance & Grades -->
       <a href="monitor_attendance.php" class="bg-white rounded-lg shadow p-6 flex flex-col items-center hover:shadow-lg transition">
         <span class="material-icons text-purple-600 text-4xl mb-2">qr_code_scanner</span>

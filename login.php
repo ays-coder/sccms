@@ -89,7 +89,7 @@
             <input type="checkbox" name="remember" class="h-4 w-4 text-[var(--primary-color)] border-gray-300 rounded focus:ring-[var(--primary-color)]">
             <span class="ml-2">Remember me</span>
           </label>
-          <a href="#" class="text-[var(--primary-color)] hover:text-opacity-80">Forgot password?</a>
+          <a href="forgot_password.php" class="text-[var(--primary-color)] hover:text-opacity-80">Forgot password?</a>
         </div>
 
         <button type="submit" class="flex justify-center items-center w-full bg-[var(--primary-color)] text-white py-3 rounded-md font-semibold hover:bg-opacity-90 transition-all">
@@ -110,7 +110,7 @@
       <nav class="flex justify-center flex-wrap gap-6 mb-4">
         <a href="#">Privacy Policy</a>
         <a href="#">Terms of Service</a>
-        <a href="#">Contact Us</a>
+        <a href="contact.php">Contact Us</a>
       </nav>
       <p>© 2024 Smart Commerce Core. All rights reserved.</p>
     </div>

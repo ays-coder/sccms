@@ -127,7 +127,7 @@
           <div>
             <h3 class="font-bold mb-2">Quick Links</h3>
             <ul class="space-y-1">
-              <li><a href="#" class="footer-link">About</a></li>
+              <li><a href="about.php" class="footer-link">About</a></li>
               <li><a href="courses.php" class="footer-link">Courses</a></li>
               <li><a href="login.php" class="footer-link">Login</a></li>
               <li><a href="register.php" class="footer-link">Register</a></li>
@@ -137,8 +137,8 @@
             <h3 class="font-bold mb-2">Connect</h3>
             <ul class="space-y-1">
               <li><a href="contact.php" class="footer-link">Contact</a></li>
-              <li><a href="#" class="footer-link">Privacy Policy</a></li>
-              <li><a href="#" class="footer-link">Terms of Service</a></li>
+              <li><a href="privacy.php" class="footer-link" target="_blank">Privacy Policy</a></li>
+              <li><a href="terms.php" class="footer-link" target="_blank">Terms of Service</a></li>
             </ul>
           </div>
         </div>

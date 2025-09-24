@@ -1,8 +1,8 @@
- <?php
+<?php
 session_start();
 require_once 'db_connect.php';
 
-// Check if the user is logged in
+// Check login
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
@@ -13,21 +13,64 @@ $role = $_SESSION['role'];
 $message = "";
 
 /* --------------------------
-   Tutor: Upload New Assignment
+   Tutor: Upload New Assignment (with PDF)
 --------------------------- */
 if ($role === 'tutor' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_assignment'])) {
     $course_id = $_POST['course_id'];
     $title = $_POST['title'];
     $description = $_POST['description'];
     $due_date = $_POST['due_date'];
-    $uploaded_by = $_SESSION['user_id'];
 
-    $stmt = $conn->prepare("INSERT INTO assignments (course_id, title, description, due_date, uploaded_by) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssi", $course_id, $title, $description, $due_date, $user_id);
+    $file_path = null;
+    if (!empty($_FILES['assignment_file']['name'])) {
+        $upload_dir = "uploads/assignment_pdfs/";
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+        $file_name = time() . "_" . basename($_FILES['assignment_file']['name']);
+        $file_tmp = $_FILES['assignment_file']['tmp_name'];
+        $file_path = $upload_dir . $file_name;
+
+        if (!move_uploaded_file($file_tmp, $file_path)) {
+            $file_path = null;
+            $message = "File upload failed!";
+        }
+    }
+
+    $stmt = $conn->prepare("INSERT INTO assignments (course_id, title, description, file_path, due_date, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssssi", $course_id, $title, $description, $file_path, $due_date, $user_id);
     if ($stmt->execute()) {
         $message = "Assignment uploaded successfully!";
     } else {
         $message = "Failed to upload assignment.";
+    }
+}
+
+/* --------------------------
+   Tutor: Delete Assignment
+--------------------------- */
+if ($role === 'tutor' && isset($_POST['delete_assignment'])) {
+    $assignment_id = intval($_POST['assignment_id']);
+
+    // First fetch file path to delete from server
+    $stmt = $conn->prepare("SELECT file_path FROM assignments WHERE assignment_id = ? AND uploaded_by = ?");
+    $stmt->bind_param("ii", $assignment_id, $user_id);
+    $stmt->execute();
+    $stmt->bind_result($file_path);
+    $stmt->fetch();
+    $stmt->close();
+
+    if ($file_path && file_exists($file_path)) {
+        unlink($file_path); // delete file
+    }
+
+    // Delete from DB
+    $stmt = $conn->prepare("DELETE FROM assignments WHERE assignment_id = ? AND uploaded_by = ?");
+    $stmt->bind_param("ii", $assignment_id, $user_id);
+    if ($stmt->execute()) {
+        $message = "Assignment deleted successfully!";
+    } else {
+        $message = "Failed to delete assignment.";
     }
 }
 
@@ -40,7 +83,6 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
     $file_tmp = $_FILES['submission_file']['tmp_name'];
     $upload_dir = "uploads/assignments/";
 
-    // Create folder if not exists
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
     }
@@ -67,7 +109,7 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen p-6 font-sans">
-<div class="max-w-5xl mx-auto">
+<div class="max-w-6xl mx-auto">
     <h1 class="text-3xl font-bold mb-6 text-center text-blue-700">Manage Assignments</h1>
 
     <?php if (!empty($message)): ?>
@@ -76,7 +118,7 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
 
     <!-- Tutor Upload Form -->
     <?php if ($role === 'tutor'): ?>
-    <form method="POST" class="bg-white p-6 rounded shadow mb-10">
+    <form method="POST" enctype="multipart/form-data" class="bg-white p-6 rounded shadow mb-10">
         <input type="hidden" name="upload_assignment" value="1">
         <div class="mb-4">
             <label class="block text-sm font-medium mb-1">Course ID</label>
@@ -89,6 +131,10 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
         <div class="mb-4">
             <label class="block text-sm font-medium mb-1">Description</label>
             <textarea name="description" required class="w-full border border-gray-300 p-2 rounded"></textarea>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Assignment PDF</label>
+            <input type="file" name="assignment_file" accept="application/pdf" class="w-full border p-2 rounded">
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium mb-1">Due Date</label>
@@ -108,6 +154,7 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
                 <th class="px-4 py-2">Course ID</th>
                 <th class="px-4 py-2">Title</th>
                 <th class="px-4 py-2">Description</th>
+                <th class="px-4 py-2">PDF</th>
                 <th class="px-4 py-2">Due Date</th>
                 <th class="px-4 py-2">Actions</th>
             </tr>
@@ -127,8 +174,15 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
                 <td class="px-4 py-2"><?= htmlspecialchars($row['course_id']) ?></td>
                 <td class="px-4 py-2"><?= htmlspecialchars($row['title']) ?></td>
                 <td class="px-4 py-2"><?= htmlspecialchars($row['description']) ?></td>
-                <td class="px-4 py-2"><?= htmlspecialchars($row['due_date']) ?></td>
                 <td class="px-4 py-2">
+                    <?php if (!empty($row['file_path'])): ?>
+                        <a href="<?= htmlspecialchars($row['file_path']) ?>" target="_blank" class="text-blue-600 underline">View PDF</a>
+                    <?php else: ?>
+                        <span class="text-gray-400">No PDF</span>
+                    <?php endif; ?>
+                </td>
+                <td class="px-4 py-2"><?= htmlspecialchars($row['due_date']) ?></td>
+                <td class="px-4 py-2 space-x-2">
                     <?php if ($role === 'student'): ?>
                         <form method="POST" enctype="multipart/form-data" class="flex space-x-2">
                             <input type="hidden" name="submit_assignment" value="1">
@@ -141,12 +195,20 @@ if ($role === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
                            class="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700">
                             View Submissions
                         </a>
+                        <form method="POST" class="inline">
+                            <input type="hidden" name="delete_assignment" value="1">
+                            <input type="hidden" name="assignment_id" value="<?= $row['assignment_id'] ?>">
+                            <button type="submit" onclick="return confirm('Are you sure you want to delete this assignment?')" 
+                                    class="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700">
+                                Delete
+                            </button>
+                        </form>
                     <?php endif; ?>
                 </td>
             </tr>
             <?php endwhile; else: ?>
             <tr>
-                <td colspan="6" class="text-center text-gray-500 py-4">No assignments found.</td>
+                <td colspan="7" class="text-center text-gray-500 py-4">No assignments found.</td>
             </tr>
             <?php endif; ?>
             </tbody>

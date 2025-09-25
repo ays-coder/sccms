@@ -2,139 +2,179 @@
 session_start();
 require_once 'db_connect.php';
 
-// Check admin login
-function check_admin_login() {
-    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header("Location: login.php");
-        exit();
+// Ensure only admin can access
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: login.php");
+    exit();
+}
+
+$error = "";
+
+// Handle new user creation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
+    $username   = trim($_POST['username']);
+    $email      = trim($_POST['email']);
+    $password   = password_hash($_POST['password'], PASSWORD_DEFAULT);
+    $role       = trim($_POST['role']);
+    $parent_of  = isset($_POST['parent_of']) ? trim($_POST['parent_of']) : null;
+
+    if (!empty($username) && !empty($email) && !empty($_POST['password']) && !empty($role)) {
+        if ($role === 'parent' && empty($parent_of)) {
+            $error = "Parent accounts must have a child's student email.";
+        } else {
+            // Insert into users table
+            $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, parent_of, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("sssss", $username, $email, $password, $role, $parent_of);
+            $stmt->execute();
+
+            // If tutor, also insert into tutor table
+            if ($role === 'tutor') {
+                $new_user_id = $conn->insert_id; // get inserted user_id
+                $stmtTutor = $conn->prepare("INSERT INTO tutor (user_id, name, email, created_at) VALUES (?, ?, ?, NOW())");
+                $stmtTutor->bind_param("iss", $new_user_id, $username, $email);
+                $stmtTutor->execute();
+            }
+
+            header("Location: manage_users.php");
+            exit();
+        }
+    } else {
+        $error = "All fields are required to create a new user.";
     }
 }
-check_admin_login();
 
-// Handle delete
+// Handle user deletion
 if (isset($_GET['delete'])) {
-    $delete_id = intval($_GET['delete']);
+    $user_id = intval($_GET['delete']);
     $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $delete_id);
+    $stmt->bind_param("i", $user_id);
     $stmt->execute();
     header("Location: manage_users.php");
     exit();
 }
 
-// Handle new admin creation
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_admin'])) {
-    $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+// Fetch all users grouped by role
+$users = [
+    'admin'   => [],
+    'tutor'   => [],
+    'student' => [],
+    'parent'  => []
+];
 
-    if (!empty($username) && !empty($email) && !empty($_POST['password'])) {
-        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, created_at) VALUES (?, ?, ?, 'admin', NOW())");
-        $stmt->bind_param("sss", $username, $email, $password);
-        $stmt->execute();
-        header("Location: manage_users.php");
-        exit();
-    } else {
-        $error = "All fields are required to create a new admin.";
-    }
+$result = $conn->query("SELECT * FROM users ORDER BY role, username");
+while ($row = $result->fetch_assoc()) {
+    $users[$row['role']][] = $row;
 }
-
-// Fetch users by role
-$students = $conn->query("SELECT * FROM users WHERE role = 'student'");
-$parents  = $conn->query("SELECT * FROM users WHERE role = 'parent'");
-$tutors   = $conn->query("SELECT * FROM users WHERE role = 'tutor'");
-$admins   = $conn->query("SELECT * FROM users WHERE role = 'admin'");
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Manage Users | Smart Commerce Core</title>
-  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>body { font-family: 'Public Sans', sans-serif; }</style>
+  <title>Manage Users - Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
-  <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
-    <div class="flex items-center gap-2">
-      <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z" /></svg>
-      <span class="text-xl font-bold text-blue-700">Manage Users</span>
-    </div>
+<body class="bg-gray-100">
+
+  <!-- Header -->
+  <div class="bg-blue-600 text-white p-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold">Manage Users</h1>
     <div>
-      <span class="mr-4 text-gray-700 font-semibold"><?= htmlspecialchars($_SESSION['username']) ?> (<?= htmlspecialchars($_SESSION['email']) ?>)</span>
-      <a href="logout.php" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</a>
+      <span class="mr-4"><?= htmlspecialchars($_SESSION['username']) ?> (<?= htmlspecialchars($_SESSION['email']) ?>)</span>
+      <a href="admin_dashboard.php" class="bg-white text-blue-600 px-4 py-2 rounded shadow hover:bg-gray-200">Back to Dashboard</a>
+      <a href="logout.php" class="ml-2 bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600">Logout</a>
     </div>
-  </header>
+  </div>
 
-  <main class="max-w-7xl mx-auto py-10">
-
-    <!-- Create Admin Form -->
+  <div class="max-w-6xl mx-auto p-6">
+    
+    <!-- Create User Form -->
     <div class="bg-white p-6 shadow rounded-lg mb-10">
-      <h2 class="text-2xl font-semibold mb-4 text-blue-700">Create New Admin</h2>
+      <h2 class="text-2xl font-semibold mb-4 text-blue-700">Create New User</h2>
       <?php if (!empty($error)): ?>
         <p class="text-red-500 mb-4"><?= htmlspecialchars($error) ?></p>
       <?php endif; ?>
-      <form method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <form method="POST" class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <input type="text" name="username" placeholder="Username" class="border rounded p-2" required>
         <input type="email" name="email" placeholder="Email" class="border rounded p-2" required>
         <input type="password" name="password" placeholder="Password" class="border rounded p-2" required>
-        <button type="submit" name="create_admin" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Admin</button>
+
+        <!-- Role Selector -->
+        <select name="role" class="border rounded p-2" required onchange="toggleParentField(this.value)">
+          <option value="">Select Role</option>
+          <option value="admin">Admin</option>
+          <option value="tutor">Tutor</option>
+          <option value="student">Student</option>
+          <option value="parent">Parent</option>
+        </select>
+
+        <!-- Parent Of (only if role = parent) -->
+        <input type="email" name="parent_of" id="parent_of" placeholder="Child's Student Email"
+               class="border rounded p-2 hidden">
+        
+        <button type="submit" name="create_user" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          Add User
+        </button>
       </form>
     </div>
 
-    <h1 class="text-3xl font-bold mb-8 text-center">All User Roles</h1>
-
-    <div class="flex flex-col gap-8">
-      <?php
-      $roles = [
-        'Admins' => $admins,
-        'Tutors' => $tutors,
-        'Students' => $students,
-        'Parents' => $parents
-      ];
-      foreach ($roles as $title => $result):
-      ?>
-        <div class="bg-white shadow rounded-lg p-4">
-          <h2 class="text-xl font-semibold text-blue-700 mb-4"><?= $title ?></h2>
+    <!-- User Lists -->
+    <?php foreach ($users as $role => $list): ?>
+      <div class="mb-8">
+        <h2 class="text-xl font-semibold text-gray-700 mb-4 capitalize"><?= ucfirst($role) ?>s</h2>
+        <?php if (count($list) > 0): ?>
           <div class="overflow-x-auto">
-            <table class="min-w-full text-sm text-left text-gray-600">
-              <thead class="bg-blue-100 text-blue-800 uppercase text-xs">
+            <table class="w-full bg-white shadow rounded-lg">
+              <thead class="bg-gray-200">
                 <tr>
-                  <th class="px-4 py-2">User ID</th>
-                  <th class="px-4 py-2">Username</th>
-                  <th class="px-4 py-2">Email</th>
-                  <th class="px-4 py-2">Created</th>
-                  <th class="px-4 py-2 text-right">Action</th>
+                  <th class="p-3 text-left">ID</th>
+                  <th class="p-3 text-left">Username</th>
+                  <th class="p-3 text-left">Email</th>
+                  <?php if ($role === 'parent'): ?>
+                    <th class="p-3 text-left">Parent Of</th>
+                  <?php endif; ?>
+                  <th class="p-3 text-left">Created At</th>
+                  <th class="p-3 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <?php if ($result && $result->num_rows > 0): ?>
-                  <?php while($row = $result->fetch_assoc()): ?>
-                    <tr class="border-b hover:bg-gray-50">
-                      <td class="px-4 py-2"><?= $row['user_id'] ?></td>
-                      <td class="px-4 py-2"><?= htmlspecialchars($row['username']) ?></td>
-                      <td class="px-4 py-2"><?= htmlspecialchars($row['email']) ?></td>
-                      <td class="px-4 py-2"><?= $row['created_at'] ?></td>
-                      <td class="px-4 py-2 text-right">
-                        <?php if ($row['user_id'] != $_SESSION['user_id']): ?>
-                          <a href="?delete=<?= $row['user_id'] ?>" onclick="return confirm('Delete this user?');"
-                             class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs">Delete</a>
-                        <?php endif; ?>
-                      </td>
-                    </tr>
-                  <?php endwhile; ?>
-                <?php else: ?>
-                  <tr><td colspan="5" class="px-4 py-2 text-center text-gray-500">No <?= strtolower($title) ?> found.</td></tr>
-                <?php endif; ?>
+                <?php foreach ($list as $user): ?>
+                  <tr class="border-b">
+                    <td class="p-3"><?= $user['user_id'] ?></td>
+                    <td class="p-3"><?= htmlspecialchars($user['username']) ?></td>
+                    <td class="p-3"><?= htmlspecialchars($user['email']) ?></td>
+                    <?php if ($role === 'parent'): ?>
+                      <td class="p-3"><?= htmlspecialchars($user['parent_of']) ?></td>
+                    <?php endif; ?>
+                    <td class="p-3"><?= $user['created_at'] ?></td>
+                    <td class="p-3">
+                      <a href="manage_users.php?delete=<?= $user['user_id'] ?>" 
+                         onclick="return confirm('Are you sure you want to delete this user?')" 
+                         class="text-red-600 hover:underline">Delete</a>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
               </tbody>
             </table>
           </div>
-        </div>
-      <?php endforeach; ?>
-    </div>
+        <?php else: ?>
+          <p class="text-gray-500">No <?= $role ?> accounts found.</p>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
 
-    <div class="mt-8 text-center">
-      <a href="admin_dashboard.php" class="text-blue-600 hover:underline">← Back to Dashboard</a>
-    </div>
-  </main>
+  </div>
+
+<script>
+function toggleParentField(role) {
+  const field = document.getElementById('parent_of');
+  if (role === 'parent') {
+    field.classList.remove('hidden');
+    field.setAttribute('required', 'true');
+  } else {
+    field.classList.add('hidden');
+    field.removeAttribute('required');
+  }
+}
+</script>
 </body>
 </html>

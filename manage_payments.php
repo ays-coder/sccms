@@ -9,7 +9,10 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 }
 
 // Fetch payment records
-$sql = "SELECT payment_id, student_id, amount, status, paid_at FROM payments";
+$sql = "SELECT p.payment_id, u.username, p.amount, p.payment_status, p.payment_date, p.payment_method, p.receipt_number 
+        FROM payments p
+        LEFT JOIN course_registrations cr ON p.registration_id = cr.registration_id
+        LEFT JOIN users u ON cr.student_id = u.user_id";
 $result = $conn->query($sql);
 ?>
 <!DOCTYPE html>
@@ -47,10 +50,12 @@ $result = $conn->query($sql);
         <thead class="bg-gray-100 text-gray-700 text-left text-sm uppercase font-semibold">
           <tr>
             <th class="px-6 py-3">Payment ID</th>
-            <th class="px-6 py-3">Student ID</th>
+            <th class="px-6 py-3">Student Name</th>
             <th class="px-6 py-3">Amount</th>
+            <th class="px-6 py-3">Method</th>
+            <th class="px-6 py-3">Receipt #</th>
             <th class="px-6 py-3">Status</th>
-            <th class="px-6 py-3">Paid At</th>
+            <th class="px-6 py-3">Payment Date</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 text-sm text-gray-700">
@@ -58,14 +63,16 @@ $result = $conn->query($sql);
             <?php while ($row = $result->fetch_assoc()): ?>
               <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4"><?= htmlspecialchars($row['payment_id']) ?></td>
-                <td class="px-6 py-4"><?= htmlspecialchars($row['student_id']) ?></td>
+                <td class="px-6 py-4"><?= htmlspecialchars($row['username']) ?></td>
                 <td class="px-6 py-4">Rs. <?= htmlspecialchars($row['amount']) ?></td>
+                <td class="px-6 py-4"><?= htmlspecialchars(str_replace('_', ' ', ucfirst($row['payment_method']))) ?></td>
+                <td class="px-6 py-4"><?= htmlspecialchars($row['receipt_number']) ?></td>
                 <td class="px-6 py-4">
-                  <span class="<?= $row['status'] === 'paid' ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold' ?>">
-                    <?= htmlspecialchars(ucfirst($row['status'])) ?>
+                  <span class="<?= $row['payment_status'] === 'completed' ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold' ?>">
+                    <?= htmlspecialchars(ucfirst($row['payment_status'])) ?>
                   </span>
                 </td>
-                <td class="px-6 py-4"><?= htmlspecialchars($row['paid_at']) ?></td>
+                <td class="px-6 py-4"><?= htmlspecialchars($row['payment_date']) ?></td>
               </tr>
             <?php endwhile; ?>
           <?php else: ?>

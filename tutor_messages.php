@@ -1,4 +1,4 @@
-<?php
+ <?php
 session_start();
 require_once 'db_connect.php';
 
@@ -13,27 +13,44 @@ $status = "";
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $emails = isset($_POST['selected_emails']) ? explode(',', $_POST['selected_emails']) : [];
-    $subject = $_POST['subject'];
-    $message = wordwrap($_POST['message'], 70);
-    $headers = "From: tutor@smartcommercecore.com\r\n";
+    $subject = trim($_POST['subject']);
+    $message = trim($_POST['message']);
+    $tutor_id = $_SESSION['user_id'];
 
     $successCount = 0;
     $failCount = 0;
 
     foreach ($emails as $email) {
         $email = trim($email);
-        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            if (mail($email, $subject, $message, $headers)) {
+
+        // Find student by email
+        $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ? AND role = 'student'");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->bind_result($student_id);
+
+        if ($stmt->fetch()) {
+            $stmt->close();
+
+            // Insert into notifications table
+            $stmt2 = $conn->prepare("INSERT INTO notifications (user_id, title, message, seen, created_at) VALUES (?, ?, ?, 0, NOW())");
+            $stmt2->bind_param("iss", $student_id, $subject, $message);
+
+            if ($stmt2->execute()) {
                 $successCount++;
             } else {
                 $failCount++;
             }
+            $stmt2->close();
+        } else {
+            $failCount++;
+            $stmt->close();
         }
     }
 
-    $status = "$successCount message(s) sent successfully.";
+    $status = "$successCount message(s) stored successfully.";
     if ($failCount > 0) {
-        $status .= " $failCount message(s) failed to send.";
+        $status .= " $failCount message(s) failed.";
     }
 }
 

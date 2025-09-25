@@ -11,11 +11,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 // Query: Students with last payment older than 2 months OR no payments
 $query = "
     SELECT u.user_id, u.username, u.email, u.status,
-           MAX(p.paid_at) AS last_payment_date
+           MAX(p.payment_date) AS last_payment_date
     FROM users u
-    LEFT JOIN payments p ON u.user_id = p.student_id
+    LEFT JOIN course_registrations cr ON u.user_id = cr.student_id
+    LEFT JOIN payments p ON cr.registration_id = p.registration_id
     WHERE u.role = 'student'
-    GROUP BY u.user_id
+    GROUP BY u.user_id, u.username, u.email, u.status
     HAVING last_payment_date IS NULL OR last_payment_date < DATE_SUB(CURDATE(), INTERVAL 2 MONTH)
     ORDER BY last_payment_date ASC
 ";

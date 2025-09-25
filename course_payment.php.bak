@@ -21,8 +21,6 @@ if (isset($_GET['course_id'])) {
     $stmt->execute();
     $course = $stmt->get_result()->fetch_assoc();
 }
-
-// Process payment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
     $parent_id = $_SESSION['user_id'];
     
@@ -57,8 +55,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
         }
     }
 
-    // Only proceed if there are no validation errors
-    if (empty($error_message)) {
+// Check if user is logged in as parent
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'parent') {
+    header("Location: login.php");
+    exit();
+}
+
+$error_message = '';
+$success_message = '';
+$course = null;
+$registration = null;
+
+// Get course details
+if (isset($_GET['course_id'])) {
+    $course_id = intval($_GET['course_id']);
+    $stmt = $conn->prepare("SELECT * FROM courses WHERE course_id = ?");
+    $stmt->bind_param("i", $course_id);
+    $stmt->execute();
+    $course = $stmt->get_result()->fetch_assoc();
+}
+
+// Process payment
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
+    $parent_id = $_SESSION['user_id'];
+    
+    // Validate required fields
+    if (!isset($_POST['student_id']) || empty($_POST['student_id'])) {
+        $error_message = "Please select a student.";
+    } elseif (!isset($_POST['payment_method']) || empty($_POST['payment_method'])) {
+        $error_message = "Please select a payment method.";
+    } elseif (!isset($_POST['course_id']) || empty($_POST['course_id'])) {
+        $error_message = "Invalid course selection.";
+    } else {
         $student_id = intval($_POST['student_id']);
         $course_id = intval($_POST['course_id']);
         $payment_method = $_POST['payment_method'];
@@ -105,18 +133,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
                         throw new Exception("Course not found or not active");
                     }
                     
-                    // Create course registration
+                    // Create course registration with proper checks
                     $reg_stmt = $conn->prepare("
                         INSERT INTO course_registrations 
                         (course_id, student_id, parent_id, status, registration_date) 
-                        VALUES (?, ?, ?, 'pending', NOW())
+                        SELECT ?, ?, ?, 'pending', NOW()
+                        FROM users 
+                        WHERE user_id = ? AND role = 'parent'
+                        LIMIT 1
                     ");
                     
                     if (!$reg_stmt) {
                         throw new Exception("Registration preparation failed: " . $conn->error);
                     }
                     
-                    $reg_stmt->bind_param("iii", $course_id, $student_id, $parent_id);
+                    $reg_stmt->bind_param("iiii", $course_id, $student_id, $parent_id, $parent_id);
                     if (!$reg_stmt->execute()) {
                         throw new Exception("Registration failed: " . $reg_stmt->error);
                     }
@@ -127,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
                     $receipt_number = 'RCP' . date('Ymd') . str_pad($registration_id, 4, '0', STR_PAD_LEFT);
                     error_log("Generated receipt number: $receipt_number");
                     
-                    // Create payment record
+                    // Create payment record with proper error handling
                     $payment_stmt = $conn->prepare("
                         INSERT INTO payments 
                         (registration_id, amount, payment_method, receipt_number, payment_status, payment_date) 
@@ -144,7 +175,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
                     }
                     error_log("Payment record created successfully");
 
-                    // Update course registration status
+                    // Update course registration status to completed
+                    $update_reg_stmt = $conn->prepare("
+                        UPDATE course_registrations 
+                        SET status = 'completed'
+                        WHERE registration_id = ?
+                    ");
+                    
+                    if (!$update_reg_stmt) {
+                        throw new Exception("Registration update preparation failed: " . $conn->error);
+                    }
+                    
+                    $update_reg_stmt->bind_param("i", $registration_id);
+                    if (!$update_reg_stmt->execute()) {
+                        throw new Exception("Registration update failed: " . $update_reg_stmt->error);
+                    }
+                    error_log("Course registration updated to completed status");
+                    
+                    // Update registration status
                     $update_stmt = $conn->prepare("
                         UPDATE course_registrations 
                         SET status = 'completed' 
@@ -165,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_payment'])) {
                     $conn->commit();
                     error_log("Transaction committed successfully");
                     
-                    // Store success message and redirect
+                    // Store success message in session and redirect
                     $_SESSION['success_message'] = "Payment successful! Your receipt number is " . $receipt_number;
                     header("Location: download_receipt.php?receipt=" . $receipt_number);
                     exit();
@@ -272,7 +320,7 @@ $children = $children_stmt->get_result();
 
                 <!-- Payment Form -->
                 <div class="p-6">
-                    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+                    <form method="POST" class="space-y-6">
                         <input type="hidden" name="course_id" value="<?= $course['course_id'] ?>">
                         
                         <!-- Student Selection -->

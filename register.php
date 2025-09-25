@@ -157,5 +157,19 @@ $selected_role = isset($_GET['role']) ? $_GET['role'] : '';
       if (!valid) e.preventDefault();
     });
   </script>
+  <script>
+// ...existing validation code...
+
+const roleSelect = document.querySelector('select[name="role"]');
+roleSelect.addEventListener('change', function() {
+    if (this.value === 'tutor') {
+        // Show success message if redirected from registration
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('registration') === 'success' && urlParams.get('role') === 'tutor') {
+            alert('Tutor registration successful! Please check your email for your Tutor ID.');
+        }
+    }
+});
+</script>
 </body>
 </html>

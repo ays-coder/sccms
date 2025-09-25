@@ -1,3 +1,24 @@
+<?php
+session_start();
+$error_message = '';
+
+if (isset($_GET['error'])) {
+    switch ($_GET['error']) {
+        case 'empty_fields':
+            $error_message = 'Please fill in all fields.';
+            break;
+        case 'invalid_credentials':
+            $error_message = 'Invalid email or password.';
+            break;
+        case 'user_not_found':
+            $error_message = 'No account found with this email.';
+            break;
+        case 'account_inactive':
+            $error_message = 'Your account is currently inactive. Please contact admin.';
+            break;
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,6 +84,18 @@
         <p class="mt-2 text-sm text-[var(--text-secondary)]">Login to your Smart Commerce Core dashboard</p>
       </div>
 
+      <?php if ($error_message): ?>
+      <div class="bg-red-50 text-red-500 p-4 rounded-lg mb-6">
+          <?php echo htmlspecialchars($error_message); ?>
+      </div>
+      <?php endif; ?>
+
+      <?php if (isset($_GET['registration']) && $_GET['registration'] === 'success'): ?>
+      <div class="bg-green-50 text-green-500 p-4 rounded-lg mb-6">
+          Registration successful! Please login with your credentials.
+      </div>
+      <?php endif; ?>
+
       <form class="bg-white p-8 shadow-xl rounded-xl space-y-6" method="POST" action="login_action.php">
         <div>
           <label for="email" class="sr-only">Username or Email</label>
@@ -89,7 +122,7 @@
             <input type="checkbox" name="remember" class="h-4 w-4 text-[var(--primary-color)] border-gray-300 rounded focus:ring-[var(--primary-color)]">
             <span class="ml-2">Remember me</span>
           </label>
-          <a href="#" class="text-[var(--primary-color)] hover:text-opacity-80">Forgot password?</a>
+          <a href="forgotpassword.php" class="text-[var(--primary-color)] hover:text-opacity-80">Forgot password?</a>
         </div>
 
         <button type="submit" class="flex justify-center items-center w-full bg-[var(--primary-color)] text-white py-3 rounded-md font-semibold hover:bg-opacity-90 transition-all">

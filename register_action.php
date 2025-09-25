@@ -1,22 +1,19 @@
- <?php
+<?php
 require_once 'db_connect.php';
 
-// Create default admin account if not exists
-$admin_email = 'admin@gmail.com';
-$admin_password = password_hash('admin', PASSWORD_DEFAULT);
-$admin_check = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-$admin_check->bind_param("s", $admin_email);
-$admin_check->execute();
-$admin_result = $admin_check->get_result();
+// Create tutor table if it doesn't exist
+$create_tutor_table = "CREATE TABLE IF NOT EXISTS tutor (
+    tutor_id VARCHAR(10) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)";
 
-if ($admin_result->num_rows === 0) {
-    $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, created_at) VALUES (?, ?, ?, 'admin', NOW())");
-    $admin_name = "Admin";
-    $stmt->bind_param("sss", $admin_name, $admin_email, $admin_password);
-    $stmt->execute();
-    $stmt->close();
+if (!$conn->query($create_tutor_table)) {
+    die("Error creating tutor table: " . $conn->error);
 }
-$admin_check->close();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
@@ -25,12 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
-    // Validate name
+    // Validation checks
     if (!preg_match("/^[A-Za-z\s]+$/", $username)) {
         die("Name can only contain letters and spaces.");
     }
 
-    // Validate password length
     if (strlen($password) < 8) {
         die("Password must be at least 8 characters long.");
     }
@@ -40,31 +36,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-    $parent_of = null;
 
-    // Check if email already exists
-    $check = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-    $check->bind_param("s", $email);
-    $check->execute();
-    $result = $check->get_result();
+    // Handle tutor registration
+    if ($role === 'tutor') {
+        // Check if tutor email exists
+        $check = $conn->prepare("SELECT tutor_id FROM tutor WHERE email = ?");
+        $check->bind_param("s", $email);
+        $check->execute();
+        $result = $check->get_result();
 
-    if ($result->num_rows > 0) {
-        die("Email is already registered.");
-    }
+        if ($result->num_rows > 0) {
+            die("Email is already registered as a tutor.");
+        }
 
-    // Insert into users table
-    $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, parent_of, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-    $stmt->bind_param("sssss", $username, $email, $hashed_password, $role, $parent_of);
+        // Generate unique tutor ID
+        $tutor_id = 'TUT' . str_pad(mt_rand(1, 999999), 6, '0', STR_PAD_LEFT);
 
-    if ($stmt->execute()) {
-        header("Location: login.php");
-        exit();
+        // Insert into tutor table
+        $stmt = $conn->prepare("INSERT INTO tutor (tutor_id, username, email, password) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $tutor_id, $username, $email, $hashed_password);
+
+        if ($stmt->execute()) {
+            // Send welcome email
+            $to = $email;
+            $subject = "Welcome to Smart Commerce Core - Tutor Registration";
+            $message = "Dear $username,\n\n"
+                    . "Welcome to Smart Commerce Core!\n"
+                    . "Your registration as a tutor was successful.\n"
+                    . "Your Tutor ID is: $tutor_id\n\n"
+                    . "Best regards,\nSmart Commerce Core Team";
+            $headers = "From: noreply@smartcommercecore.com";
+            
+            mail($to, $subject, $message, $headers);
+            
+            header("Location: login.php?registration=success&role=tutor");
+            exit();
+        } else {
+            die("Tutor registration failed. Please try again. Error: " . $conn->error);
+        }
+
+        $stmt->close();
+        $check->close();
     } else {
-        echo "Registration failed. Try again.";
-    }
+        // Handle other roles registration
+        $parent_of = null;
+        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, parent_of, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param("sssss", $username, $email, $hashed_password, $role, $parent_of);
 
-    $stmt->close();
-    $check->close();
+        if ($stmt->execute()) {
+            header("Location: login.php?registration=success");
+            exit();
+        } else {
+            die("Registration failed. Please try again.");
+        }
+
+        $stmt->close();
+    }
 }
 $conn->close();
 ?>

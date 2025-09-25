@@ -1,0 +1,4 @@
+i need to implement payment gatway only using card payments using free api(100% Free Test Payment (PayHere Sandbox)), create a payment Gatway interaction in student_dashboard.php, if user pay  then payment goes to 228200120051744
+Ahm ayaas
+People’s bank 
+Addalaichenai this account , after payment success showing success Mesage and details and dowload Recipt

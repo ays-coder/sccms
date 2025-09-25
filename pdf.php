@@ -32,23 +32,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if (move_uploaded_file($file_tmp, $target_file)) {
                 // Insert into database
-                $stmt = $conn->prepare("INSERT INTO materials (course_id, title, file_path, upload_pdf, uploaded_by, upload_date) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("isssis", $course_id, $title, $target_file, $new_file_name, $uploaded_by, $upload_date);
-                $stmt->execute();
-                $stmt->close();
-
-                header("Location: materials.php?success=1");
-                exit();
+                $stmt = $conn->prepare("INSERT INTO materials (course_id, title, file_path, uploaded_by) VALUES (?, ?, ?, ?)");
+                $stmt->bind_param("isss", $course_id, $title, $target_file, $uploaded_by);
+                
+                if ($stmt->execute()) {
+                    $stmt->close();
+                    header("Location: upload_materials.php?success=1");
+                    exit();
+                } else {
+                    unlink($target_file); // Delete the uploaded file if database insert fails
+                    header("Location: upload_materials.php?error=" . urlencode("Database error: " . $stmt->error));
+                    exit();
+                }
             } else {
-                header("Location: materials.php?error=upload_failed");
+                header("Location: upload_materials.php?error=" . urlencode("Failed to move uploaded file"));
                 exit();
             }
         } else {
-            header("Location: materials.php?error=invalid_file");
+            header("Location: upload_materials.php?error=" . urlencode("Only PDF files are allowed"));
             exit();
         }
     } else {
-        header("Location: materials.php?error=no_file");
+        header("Location: upload_materials.php?error=" . urlencode("No file uploaded or upload error"));
         exit();
     }
 }
